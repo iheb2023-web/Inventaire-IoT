@@ -1,0 +1,157 @@
+#include <WiFi.h>
+#include <HTTPClient.h>
+#include <SPI.h>
+#include <MFRC522.h>
+
+// ===================================================
+// 🔹 WIFI
+// ===================================================
+const char* ssid = "iPhone_adem";
+const char* password = "123456789*";
+
+// ===================================================
+// 🔹 BACKEND SPRING BOOT
+// ===================================================
+const char* BASE_URL = "http://172.20.10.3:8080";         // 172.20.10.10
+
+// ===================================================
+// 🔹 IDENTITÉ ESP32
+// ===================================================
+const char* deviceId = "ESP32_STOCK";
+
+// ===================================================
+// 🔹 RFID CONFIG
+// ===================================================
+#define RST_PIN 22
+#define SS_RFID_IN 5
+#define SS_RFID_OUT 17
+#define LED_IN 25  // LED verte
+#define LED_OUT 26 // LED rouge
+
+MFRC522 rfidIn(SS_RFID_IN, RST_PIN);
+MFRC522 rfidOut(SS_RFID_OUT, RST_PIN);
+
+// ===================================================
+// 🔹 SETUP
+// ===================================================
+void setup() {
+  Serial.begin(115200);
+  delay(1000);
+
+  pinMode(LED_IN, OUTPUT);
+  pinMode(LED_OUT, OUTPUT);
+  digitalWrite(LED_IN, LOW);
+  digitalWrite(LED_OUT, LOW);
+
+  // --- WiFi ---
+  Serial.print("Connexion WiFi");
+  WiFi.begin(ssid, password);
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println("\nWiFi connecté");
+  Serial.print("IP ESP32 : ");
+  Serial.println(WiFi.localIP());
+
+  // --- SPI & RFID ---
+  SPI.begin();
+  pinMode(SS_RFID_IN, OUTPUT);
+  pinMode(SS_RFID_OUT, OUTPUT);
+  digitalWrite(SS_RFID_IN, HIGH);
+  digitalWrite(SS_RFID_OUT, HIGH);
+  rfidIn.PCD_Init();
+  rfidOut.PCD_Init();
+  Serial.println("RFID IN et RFID OUT initialisés");
+}
+
+// ===================================================
+// 🔹 LOOP
+// ===================================================
+void loop() {
+  // ---------- RFID IN ----------
+  digitalWrite(SS_RFID_OUT, HIGH);
+  digitalWrite(SS_RFID_IN, LOW);
+  checkRFID(rfidIn, "IN");
+  delay(50);
+
+  // ---------- RFID OUT ----------
+  digitalWrite(SS_RFID_IN, HIGH);
+  digitalWrite(SS_RFID_OUT, LOW);
+  checkRFID(rfidOut, "OUT");
+  delay(50);
+}
+
+// ===================================================
+// 🔹 LECTURE RFID
+// ===================================================
+void checkRFID(MFRC522 &rfid, const char* direction) {
+  if (!rfid.PICC_IsNewCardPresent()) return;
+  if (!rfid.PICC_ReadCardSerial()) return;
+
+  String uid = "";
+  for (byte i = 0; i < rfid.uid.size; i++) {
+    if (rfid.uid.uidByte[i] < 0x10) uid += "0";
+    uid += String(rfid.uid.uidByte[i], HEX);
+  }
+  uid.toUpperCase();
+
+  Serial.print("UID détecté (");
+  Serial.print(direction);
+  Serial.print(") : ");
+  Serial.println(uid);
+
+  // 🔔 LED FEEDBACK
+  if (String(direction) == "IN") {
+    digitalWrite(LED_IN, HIGH);  // LED verte ON
+  } else {
+    digitalWrite(LED_OUT, HIGH); // LED rouge ON
+  }
+
+  sendToBackend(uid, direction);
+
+  delay(300); // LED allumée 300 ms
+  digitalWrite(LED_IN, LOW);
+  digitalWrite(LED_OUT, LOW);
+
+  rfid.PICC_HaltA();
+  rfid.PCD_StopCrypto1();
+}
+
+// ===================================================
+// 🔹 ENVOI HTTP VERS SPRING BOOT
+// ===================================================
+void sendToBackend(String uid, const char* direction) {
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.println("WiFi non connecté");
+    return;
+  }
+
+  String url;
+  if (String(direction) == "IN") {
+    url = String(BASE_URL) + "/api/rfid/stock/entry";
+  } else {
+    url = String(BASE_URL) + "/api/rfid/stock/exit";
+  }
+
+  HTTPClient http;
+  http.begin(url);
+  http.addHeader("Content-Type", "application/json");
+
+  String json = "{"
+                "\"rfidTag\":\"" + uid + "\","
+                "\"esp32Id\":\"" + String(deviceId) + "\","
+                "\"qty\":1"
+                "}";
+
+  int httpCode = http.POST(json);
+  String response = http.getString();
+
+  Serial.print("HTTP ");
+  Serial.print(direction);
+  Serial.print(" → Code : ");
+  Serial.println(httpCode);
+  Serial.println("Réponse serveur : " + response);
+
+  http.end();
+}
