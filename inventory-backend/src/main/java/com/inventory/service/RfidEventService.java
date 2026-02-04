@@ -23,11 +23,11 @@ public class RfidEventService {
 
 
     @Transactional
-    public void handleStockEntry(String rfidTag, Long esp32Id, int qty) {
+    public void handleStockEntry(String rfidTag, String esp32Id, int qty) {
 
         Product product = productDao.findByRfidTag(rfidTag);
         if (product == null) {
-            throw new RuntimeException("Produit inconnu. لازم تسجلو أول مرة من الفورم.");
+            throw new RuntimeException("Produit inconnu.Il faut l'enregistrer SVP !.");
         }
 
         RfidEvent event = new RfidEvent();
@@ -50,7 +50,7 @@ public class RfidEventService {
 
 
     @Transactional
-    public void handleStockExit(String rfidTag, Long esp32Id, int qty) {
+    public void handleStockExit(String rfidTag, String esp32Id, int qty) {
 
         Product product = productDao.findByRfidTag(rfidTag);
         if (product == null) {
@@ -72,7 +72,7 @@ public class RfidEventService {
 
 
     @Transactional
-    public void handleStoreEntry(String rfidTag, Long esp32Id, Long shelfId, int qty) {
+    public void handleStoreEntry(String rfidTag, String esp32Id, Long shelfId, int qty) {
 
         Product product = productDao.findByRfidTag(rfidTag);
         if (product == null) {

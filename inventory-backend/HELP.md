@@ -48,7 +48,7 @@ Password : admin
 
 2. Configurer application.properties
 
-Dans src/main/resources/application.properties, assurez-vous que la configuration correspond à la base Docker :
+    Dans src/main/resources/application.properties, assurez-vous que la configuration correspond à la base Docker :
 
 spring.application.name=inventory-backend
 

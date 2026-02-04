@@ -5,6 +5,6 @@ import lombok.Data;
 @Data
 public class RfidStockRequest {
     private String rfidTag;   // UID
-    private Long esp32Id;
+    private String esp32Id;
     private Integer qty;      // default = 1
 }

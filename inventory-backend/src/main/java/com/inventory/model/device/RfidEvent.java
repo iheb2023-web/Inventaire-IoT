@@ -18,6 +18,6 @@ public class RfidEvent {
     private Long productId;
     private EventType eventType;
     private EventLocation location;
-    private Long esp32Id;
+    private String esp32Id;
     private LocalDateTime createdAt;
 }
