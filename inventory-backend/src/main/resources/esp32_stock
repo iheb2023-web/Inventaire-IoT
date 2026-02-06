@@ -44,15 +44,17 @@ void setup() {
   digitalWrite(LED_OUT, LOW);
 
   // --- WiFi ---
-  Serial.print("Connexion WiFi");
-  WiFi.begin(ssid, password);
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
-  }
-  Serial.println("\nWiFi connecté");
-  Serial.print("IP ESP32 : ");
-  Serial.println(WiFi.localIP());
+   Serial.print("Connexion WiFi");
+    WiFi.begin(ssid, password);
+    while (WiFi.status() != WL_CONNECTED) {
+      delay(500);
+      Serial.print(".");
+      digitalWrite(LED_IN, !digitalRead(LED_IN));
+    }
+    Serial.println("\nWiFi connecté");
+    Serial.print("IP ESP32 : ");
+    Serial.println(WiFi.localIP());
+    digitalWrite(LED_IN, LOW);
 
   // --- SPI & RFID ---
   SPI.begin();

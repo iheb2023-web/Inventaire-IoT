@@ -5,6 +5,452 @@
 #include "HX711.h"
 
 // ===================================================
+// WIFI
+// ===================================================
+const char* ssid = "iPhone_adam";
+const char* password = "123456789*";
+
+// ===================================================
+// BACKEND API
+// ===================================================
+const char* apiRFID   = "http://172.20.10.10:8080/api/rfid/store/entry";
+const char* apiWeight = "http://172.20.10.10:8080/api/shelf/weight";
+
+// ===================================================
+// IDENTITÉ APPAREIL
+// ===================================================
+const char* deviceId = "ESP32_MAGASIN";
+
+// ===================================================
+// LED STATUS
+// ===================================================
+#define LED_RFID    2
+#define LED_WEIGHT  17
+
+// ===================================================
+// RFID CONFIG
+// ===================================================
+#define RST_PIN 22
+#define SS_RFID 5
+
+MFRC522 rfid(SS_RFID, RST_PIN);
+
+// ===================================================
+// HX711 CONFIG
+// ===================================================
+#define HX_DOUT 32
+#define HX_SCK  33
+
+HX711 scale;
+float CALIBRATION_FACTOR = 107.0;
+
+// ===================================================
+// TIMERS
+// ===================================================
+unsigned long lastWeightTime = 0;
+const unsigned long WEIGHT_INTERVAL = 120000; // 2 minutes
+
+// ===================================================
+// SETUP
+// ===================================================
+void setup() {
+  Serial.begin(115200);
+  delay(1000);
+
+  pinMode(LED_RFID, OUTPUT);
+  pinMode(LED_WEIGHT, OUTPUT);
+
+  // WIFI
+  Serial.print("Connexion WiFi");
+  WiFi.begin(ssid, password);
+
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+    digitalWrite(LED_RFID, !digitalRead(LED_RFID));
+  }
+
+  Serial.println("\nWiFi connecté");
+  digitalWrite(LED_RFID, LOW);
+
+  // RFID
+  SPI.begin();
+  rfid.PCD_Init();
+  Serial.println("RFID prêt");
+
+  // HX711
+  scale.begin(HX_DOUT, HX_SCK);
+  scale.set_scale(CALIBRATION_FACTOR);
+  scale.tare();
+  Serial.println("Capteur de poids prêt");
+}
+
+// ===================================================
+// LOOP
+// ===================================================
+void loop() {
+
+  checkRFID();
+
+  if (millis() - lastWeightTime > WEIGHT_INTERVAL) {
+    sendWeight();
+    lastWeightTime = millis();
+  }
+
+  delay(200);
+}
+
+// ===================================================
+// RFID
+// ===================================================
+void checkRFID() {
+
+  if (!rfid.PICC_IsNewCardPresent()) return;
+  if (!rfid.PICC_ReadCardSerial()) return;
+
+  String uid = "";
+
+  for (byte i = 0; i < rfid.uid.size; i++) {
+    if (rfid.uid.uidByte[i] < 0x10) uid += "0";
+    uid += String(rfid.uid.uidByte[i], HEX);
+  }
+
+  uid.toUpperCase();
+
+  Serial.print("RFID détecté : ");
+  Serial.println(uid);
+
+  digitalWrite(LED_RFID, HIGH);
+  sendRFID(uid);
+  digitalWrite(LED_RFID, LOW);
+
+  rfid.PICC_HaltA();
+  rfid.PCD_StopCrypto1();
+}
+
+// ===================================================
+// ENVOI RFID
+// ===================================================
+void sendRFID(String uid) {
+
+  if (WiFi.status() != WL_CONNECTED) return;
+
+  HTTPClient http;
+  http.begin(apiRFID);
+  http.addHeader("Content-Type", "application/json");
+
+  String json =
+ "{"
+  "\"rfidTag\":\"" + uid + "\","
+  "\"esp32Id\":\"" + String(deviceId) + "\","
+  "\"shelfId\":1,"
+  "\"qty\":1"
+ "}";
+
+  int code = http.POST(json);
+
+  if (code > 0) {
+
+    Serial.print("RFID envoyé | HTTP code: ");
+    Serial.println(code);
+
+    String response = http.getString();
+    Serial.println("Réponse backend RFID :");
+    Serial.println(response);
+
+  } else {
+
+    Serial.print("Erreur RFID : ");
+    Serial.println(http.errorToString(code));
+  }
+
+  http.end();
+}
+
+// ===================================================
+// ENVOI POIDS
+// ===================================================
+void sendWeight() {
+
+  if (!scale.is_ready()) return;
+  if (WiFi.status() != WL_CONNECTED) return;
+
+  digitalWrite(LED_WEIGHT, HIGH);
+
+  float weight = scale.get_units(5);
+
+  digitalWrite(LED_WEIGHT, LOW);
+
+  Serial.print("Poids étagère : ");
+  Serial.println(weight, 2);
+
+  HTTPClient http;
+  http.begin(apiWeight);
+  http.addHeader("Content-Type", "application/json");
+
+ String json =
+"{"
+  "\"device_id\":\"" + String(deviceId) + "\","
+  "\"shelfId\":1,"
+  "\"currentWeight\":" + String(weight, 2) +
+"}";
+
+
+  int code = http.POST(json);
+
+  if (code > 0) {
+
+    Serial.print("Poids envoyé | HTTP code: ");
+    Serial.println(code);
+
+    String response = http.getString();
+    Serial.println("Réponse backend poids :");
+    Serial.println(response);
+
+  } else {
+
+    Serial.print("Erreur poids : ");
+    Serial.println(http.errorToString(code));
+  }
+
+  http.end();
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#include <WiFi.h>
+#include <HTTPClient.h>
+#include <SPI.h>
+#include <MFRC522.h>
+#include "HX711.h"
+
+// ===================================================
 // 🔹 WIFI
 // ===================================================
 const char* ssid = "iPhone_adem";
