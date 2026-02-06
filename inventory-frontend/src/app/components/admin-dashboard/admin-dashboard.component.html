@@ -1,0 +1,297 @@
+<div class="admin-dashboard">
+  <header class="dashboard-header">
+    <div>
+      <h1>Dashboard Admin</h1>
+      <p class="subtitle">Magasin & Stock en temps réel</p>
+    </div>
+  </header>
+
+  <!-- VUE ACCUEIL : Grandes cartes cliquables -->
+  @if (selectedView() === 'home') {
+    @if (isLoadingStats()) {
+      <div class="loading-skeleton">
+        <div class="skeleton-card"></div>
+        <div class="skeleton-card"></div>
+        <div class="skeleton-card"></div>
+      </div>
+    } @else if (stats()) {
+      <section class="dashboard-cards">
+        <div class="dashboard-card" (click)="selectView('stock')">
+          <div class="card-icon">🏢</div>
+          <h2>Stock Principal</h2>
+          <p class="card-value">{{ stats()!.totalStock }}</p>
+          <p class="card-unit">unités</p>
+          <p class="card-action">Voir les détails →</p>
+        </div>
+        <div class="dashboard-card" (click)="selectView('store')">
+          <div class="card-icon">🏪</div>
+          <h2>Stock Magasin</h2>
+          <p class="card-value">{{ stats()!.totalStoreStock }}</p>
+          <p class="card-unit">unités</p>
+          <p class="card-action">Voir les détails →</p>
+        </div>
+        <div class="dashboard-card" (click)="selectView('products')">
+          <div class="card-icon">📦</div>
+          <h2>Produits Total</h2>
+          <p class="card-value">{{ stats()!.totalProducts }}</p>
+          <p class="card-unit">produits</p>
+          <p class="card-action">Voir les détails →</p>
+        </div>
+      </section>
+    }
+  }
+
+  <!-- VUE DÉTAILS : Stock -->
+  @if (selectedView() === 'stock' || selectedView() === 'store') {
+    <div class="details-view">
+      <header class="details-header">
+        <button class="back-btn" (click)="goBack()">← Retour</button>
+        <h2>
+          @if (selectedView() === 'stock') {
+            Détails Stock Principal
+          } @else {
+            Détails Stock Magasin
+          }
+        </h2>
+      </header>
+
+      <section class="recent-movements">
+        <header class="section-header">
+          <h3>Mouvements Récents</h3>
+          <button class="refresh-btn" (click)="loadRecentEvents()" [disabled]="isLoadingEvents()">
+            🔄
+          </button>
+        </header>
+
+        @if (isLoadingEvents()) {
+          <div class="loading-table">
+            <div class="skeleton-row"></div>
+            <div class="skeleton-row"></div>
+            <div class="skeleton-row"></div>
+          </div>
+        } @else if (recentEvents() && recentEvents().length > 0) {
+          <div class="table-responsive">
+            <table class="events-table">
+              <thead>
+                <tr>
+                  <th>Type</th>
+                  <th>Produit</th>
+                  <th>Produit ID</th>
+                  <th>Localisation</th>
+                  <th>Appareil</th>
+                  <th>Date/Heure</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (event of recentEvents(); track event.id) {
+                  <tr class="event-row" [class.entry]="event.eventType === 'ENTRY'" [class.exit]="event.eventType === 'EXIT'">
+                    <td class="event-badge">
+                      <span class="badge-icon">{{ getEventIcon(event.eventType, event.location) }}</span>
+                      {{ getEventLabel(event.eventType, event.location) }}
+                    </td>
+                    <td class="product-name"><strong>{{ event.productName }}</strong></td>
+                    <td><code>{{ event.productId }}</code></td>
+                    <td>
+                      <span class="location-badge" [class.stock]="event.location === 'STOCK'" [class.store]="event.location === 'STORE'">
+                        {{ event.location }}
+                      </span>
+                    </td>
+                    <td><small>{{ event.esp32Id }}</small></td>
+                    <td class="time">{{ event.createdAt | date: 'dd/MM HH:mm:ss' }}</td>
+                    <td class="actions">
+                      <button class="btn-delete" (click)="deleteEvent(event)" [disabled]="isLoadingDeleteEvent() === event.id" title="Supprimer">
+                        @if (isLoadingDeleteEvent() === event.id) {
+                          <span class="spinner-small"></span>
+                        } @else {
+                          🗑️
+                        }
+                      </button>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        } @else {
+          <div class="empty-state">
+            <p>📭 Aucun mouvement enregistré</p>
+          </div>
+        }
+      </section>
+    </div>
+  }
+
+  <!-- VUE DÉTAILS : Produits -->
+  @if (selectedView() === 'products') {
+    <div class="details-view">
+      <header class="details-header">
+        <button class="back-btn" (click)="goBack()">← Retour</button>
+        <div class="header-title-section">
+          <h2>Gestion des Produits</h2>
+          <button class="refresh-btn" (click)="loadProducts()" [disabled]="isLoadingProducts()">
+            🔄
+          </button>
+        </div>
+        <button class="add-product-btn" (click)="openAddProductForm()">+ Ajouter un produit</button>
+      </header>
+
+      @if (isLoadingProducts()) {
+        <div class="loading-table">
+          <div class="skeleton-row"></div>
+          <div class="skeleton-row"></div>
+          <div class="skeleton-row"></div>
+        </div>
+      } @else if (products() && products().length > 0) {
+        <div class="table-responsive">
+          <table class="products-table">
+            <thead>
+              <tr>
+                <th>Nom</th>
+                <th>Code-barres</th>
+                <th>Tag RFID</th>
+                <th>Poids (kg)</th>
+                <th>Stock</th>
+                <th>Description</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (product of products(); track product.id) {
+                <tr class="product-row">
+                  <td class="product-name"><strong>{{ product.name }}</strong></td>
+                  <td><code>{{ product.barcode }}</code></td>
+                  <td><code class="rfid-code">{{ product.rfidTag }}</code></td>
+                  <td class="text-center">{{ product.unitWeight }}</td>
+                  <td class="text-center stock-quantity">
+                    <span class="stock-badge">{{ product.stockQuantity }}</span>
+                  </td>
+                  <td class="product-desc">{{ product.description || '—' }}</td>
+                  <td class="actions">
+                    <button class="btn-edit" (click)="openEditProductForm(product)" title="Modifier">✎ Éditer</button>
+                    <button class="btn-delete" (click)="deleteProduct(product)" [disabled]="isLoadingDelete() === product.id" title="Supprimer">
+                      @if (isLoadingDelete() === product.id) {
+                        <span class="spinner-small"></span>
+                      } @else {
+                        🗑️ Supprimer
+                      }
+                    </button>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      } @else {
+        <div class="empty-state">
+          <p>📭 Aucun produit enregistré</p>
+          <button class="btn-primary" (click)="openAddProductForm()">Ajouter le premier produit</button>
+        </div>
+      }
+    </div>
+  }
+</div>
+
+<!-- Formulaire Modal -->
+@if (isFormOpen()) {
+  <div class="modal-backdrop" role="presentation" (click)="closeProductForm()"></div>
+  <div class="modal" role="dialog" aria-modal="true" [attr.aria-labelledby]="formMode() === 'new_rfid' ? 'new-product-title' : 'edit-product-title'">
+    <div class="modal-content" (click)="$event.stopPropagation()">
+      <header class="modal-header">
+        <div>
+          @if (formMode() === 'new_rfid') {
+            <div class="form-header-icon">🆕</div>
+            <h2 id="new-product-title">Nouveau produit détecté</h2>
+            @if (currentLocation()) {
+              <p class="muted">Localisation: <strong>{{ currentLocation() }}</strong></p>
+            }
+          } @else if (formMode() === 'edit_product') {
+            <div class="form-header-icon">✎</div>
+            <h2 id="edit-product-title">Modifier le produit</h2>
+          } @else {
+            <div class="form-header-icon">➕</div>
+            <h2 id="edit-product-title">Ajouter un nouveau produit</h2>
+          }
+        </div>
+        <button class="icon-button" type="button" (click)="closeProductForm()" aria-label="Fermer">
+          ✕
+        </button>
+      </header>
+
+      <form class="product-form" [formGroup]="productForm" (ngSubmit)="submitProduct()">
+        <div class="form-grid">
+          <label class="form-field">
+            <span>Nom du produit *</span>
+            <input type="text" formControlName="name" placeholder="Ex: Coca-Cola 1.5L" />
+            @if (productForm.controls.name.touched && productForm.controls.name.invalid) {
+              <span class="error">Le nom est obligatoire.</span>
+            }
+          </label>
+
+          <label class="form-field">
+            <span>Code-barres *</span>
+            <input type="text" formControlName="barcode" placeholder="Ex: 5449000000996" />
+            @if (productForm.controls.barcode.touched && productForm.controls.barcode.invalid) {
+              <span class="error">Le code-barres est obligatoire.</span>
+            }
+          </label>
+
+          <label class="form-field">
+            <span>RFID tag
+              @if (formMode() !== 'new_rfid') {
+                <span class="required">*</span>
+              }
+            </span>
+            <input 
+              type="text" 
+              formControlName="rfidTag" 
+              [readonly]="formMode() === 'new_rfid'"
+              [class.readonly-input]="formMode() === 'new_rfid'"
+              placeholder="Ex: RFID-001234567890" />
+            @if (formMode() !== 'new_rfid' && productForm.controls.rfidTag.touched && productForm.controls.rfidTag.invalid) {
+              <span class="error">Le tag RFID est obligatoire.</span>
+            }
+          </label>
+
+          <label class="form-field">
+            <span>Poids unitaire (kg) *</span>
+            <input type="number" formControlName="unitWeight" min="0.001" step="0.001" placeholder="0.5" />
+            @if (productForm.controls.unitWeight.touched && productForm.controls.unitWeight.invalid) {
+              <span class="error">Le poids doit être supérieur à 0.</span>
+            }
+          </label>
+        </div>
+
+        <label class="form-field full-width">
+          <span>Description</span>
+          <textarea rows="4" formControlName="description" placeholder="Description du produit..."></textarea>
+        </label>
+
+        @if (errorMessage()) {
+          <div class="alert error" role="alert">
+            <span class="alert-icon">⚠️</span>
+            {{ errorMessage() }}
+          </div>
+        }
+        @if (successMessage()) {
+          <div class="alert success" role="status">
+            <span class="alert-icon">✓</span>
+            {{ successMessage() }}
+          </div>
+        }
+
+        <div class="modal-actions">
+          <button class="secondary" type="button" (click)="closeProductForm()">Annuler</button>
+          <button class="primary" type="submit" [disabled]="isSaving()">
+            @if (isSaving()) {
+              <span class="spinner"></span>
+              Enregistrement...
+            } @else {
+              💾 Enregistrer
+            }
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+}
