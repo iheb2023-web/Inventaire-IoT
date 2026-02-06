@@ -11,6 +11,7 @@ import com.inventory.model.product.StoreStock;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -20,14 +21,19 @@ public class RfidEventService {
     private final StockDao stockDao;
     private final StoreStockDao storeStockDao;
     private final RfidEventDao rfidEventDao;
+    private final RfidWsService rfidWsService;
 
+    public List<RfidEvent> getAllEvents() {
+        return rfidEventDao.findAll();
+    }
 
     @Transactional
     public void handleStockEntry(String rfidTag, String esp32Id, int qty) {
 
         Product product = productDao.findByRfidTag(rfidTag);
         if (product == null) {
-            throw new RuntimeException("Produit inconnu.Il faut l'enregistrer SVP !.");
+            rfidWsService.notifyNewProduct(rfidTag, "STOCK");
+            return;
         }
 
         RfidEvent event = new RfidEvent();
@@ -102,4 +108,9 @@ public class RfidEventService {
             storeStockDao.increase(product.getId(), shelfId, qty);
         }
     }
+    @Transactional
+    public void deleteEvent(Long id) {
+        rfidEventDao.delete(id);
+    }
+
 }

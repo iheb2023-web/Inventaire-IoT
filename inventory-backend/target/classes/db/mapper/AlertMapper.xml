@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.inventory.dao.AlertDao">
+
+    <select id="findOpenAlertByShelf" resultType="com.inventory.model.device.Alert">
+        SELECT * FROM alert
+        WHERE shelf_id = #{shelfId} AND status = 'OPEN'
+        ORDER BY created_at DESC
+        LIMIT 1
+    </select>
+
+    <insert id="insert" parameterType="com.inventory.model.device.Alert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO alert (shelf_id, alert_type, status)
+        VALUES (#{shelfId}, #{alertType}, #{status})
+    </insert>
+
+    <update id="resolveAlert">
+        UPDATE alert
+        SET status = 'RESOLVED'
+        WHERE id = #{alertId}
+    </update>
+
+</mapper>
